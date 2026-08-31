@@ -55,11 +55,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun read() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.BODY_SENSORS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        val bodySensors = ContextCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS)
+        val readHeartRate = ContextCompat.checkSelfPermission(this, "android.permission.health.READ_HEART_RATE")
+        if (bodySensors != PackageManager.PERMISSION_GRANTED || readHeartRate != PackageManager.PERMISSION_GRANTED) {
             permissions.launch(
                 arrayOf(
                     Manifest.permission.BODY_SENSORS,
