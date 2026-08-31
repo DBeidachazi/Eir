@@ -36,6 +36,8 @@ class MainActivity : ComponentActivity() {
                 if (r.values.all { it }) "权限已授予，点击读取心率" else "需要心率和活动识别权限"
         }
     private val callback = object : MeasureCallback {
+        override fun onRegistered() { status = "已连接心率传感器，等待数据…" }
+        override fun onRegistrationFailed(error: Throwable) { reading = false; status = "心率读取失败：${error.message ?: error.javaClass.simpleName}" }
         override fun onAvailabilityChanged(type: DeltaDataType<*, *>, availability: Availability) {
             status = "传感器：$availability"
         }
@@ -60,6 +62,7 @@ class MainActivity : ComponentActivity() {
             permissions.launch(
                 arrayOf(
                     Manifest.permission.BODY_SENSORS,
+                    "android.permission.health.READ_HEART_RATE",
                     Manifest.permission.ACTIVITY_RECOGNITION
                 )
             ); return
