@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -49,7 +50,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(state: Bundle?) {
-        super.onCreate(state); client =
+        super.onCreate(state); window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); client =
             HealthServices.getClient(this).measureClient; setContent { EirTheme { Screen() } }
     }
 
