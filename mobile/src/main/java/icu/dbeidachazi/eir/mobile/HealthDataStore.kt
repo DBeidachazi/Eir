@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import com.google.android.gms.wearable.DataMap
 import org.json.JSONObject
+import java.io.File
 
 data class PhoneHealthSnapshot(
     val capturedAt: Long,
@@ -29,6 +30,7 @@ internal object HealthDataStore {
     private const val SNAPSHOT = "snapshot"
     private const val STATUS = "upload_status"
     private const val SENT_AT = "upload_sent_at"
+    private const val HISTORY_FILE = "health-history.jsonl"
 
     fun saveFromDataMap(context: Context, dataMap: DataMap) {
         val snapshot = readJson(context)
@@ -46,6 +48,7 @@ internal object HealthDataStore {
         if (dataMap.containsKey("sleepStateChangedAt")) snapshot.put("sleepStateChangedAt", dataMap.getLong("sleepStateChangedAt", 0L))
         dataMap.doubleOrNull("skinTemperatureCelsius")?.let { snapshot.put("skinTemperatureCelsius", it) }
         prefs(context).edit().putString(SNAPSHOT, snapshot.toString()).apply()
+        appendHistory(context, "watch", snapshot)
         broadcast(context)
     }
 
@@ -73,8 +76,16 @@ internal object HealthDataStore {
         bodyTemperatureCelsius?.let { snapshot.put("bodyTemperatureCelsius", it) }
         snapshot.put("samsungCapturedAt", capturedAt ?: System.currentTimeMillis())
         prefs(context).edit().putString(SNAPSHOT, snapshot.toString()).apply()
+        appendHistory(context, "samsung", snapshot)
         broadcast(context)
     }
+
+    fun historyCount(context: Context): Int = if (historyFile(context).exists()) {
+        historyFile(context).useLines { lines -> lines.count() }
+    } else 0
+
+    fun recentHistory(context: Context, limit: Int = 5): List<String> =
+        if (historyFile(context).exists()) historyFile(context).useLines { lines -> lines.toList().takeLast(limit).asReversed() } else emptyList()
 
     fun read(context: Context): PhoneHealthSnapshot? {
         val raw = prefs(context).getString(SNAPSHOT, null) ?: return null
@@ -120,6 +131,21 @@ internal object HealthDataStore {
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun historyFile(context: Context): File = File(context.filesDir, HISTORY_FILE)
+
+    private fun appendHistory(context: Context, source: String, snapshot: JSONObject) {
+        val entry = JSONObject().apply {
+            put("recordedAt", System.currentTimeMillis())
+            put("source", source)
+            put("snapshot", JSONObject(snapshot.toString()))
+        }
+        runCatching {
+            context.openFileOutput(HISTORY_FILE, Context.MODE_APPEND).use { output ->
+                output.write((entry.toString() + "\n").toByteArray(Charsets.UTF_8))
+            }
+        }
+    }
 
     private fun readJson(context: Context): JSONObject {
         val raw = prefs(context).getString(SNAPSHOT, null)

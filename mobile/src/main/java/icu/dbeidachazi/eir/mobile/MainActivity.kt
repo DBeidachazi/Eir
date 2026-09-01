@@ -46,6 +46,13 @@ class MainActivity : ComponentActivity() {
     private var uploadStatus by mutableStateOf("尚未上报")
     private var uploadSentAt by mutableStateOf(0L)
     private var samsungReadStatus by mutableStateOf("尚未读取 Samsung Health")
+    private var historyCount by mutableStateOf(0)
+    private var recentHistory by mutableStateOf(emptyList<String>())
+
+    private fun refreshHistory() {
+        historyCount = HealthDataStore.historyCount(this)
+        recentHistory = HealthDataStore.recentHistory(this)
+    }
 
     private val updates = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -53,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     snapshot = HealthDataStore.read(this@MainActivity)
                     uploadStatus = HealthDataStore.uploadStatus(this@MainActivity)
                     uploadSentAt = HealthDataStore.uploadSentAt(this@MainActivity)
+                    refreshHistory()
             }
         }
     }
@@ -63,6 +71,7 @@ class MainActivity : ComponentActivity() {
         snapshot = HealthDataStore.read(this)
         uploadStatus = HealthDataStore.uploadStatus(this)
         uploadSentAt = HealthDataStore.uploadSentAt(this)
+        refreshHistory()
         ContextCompat.registerReceiver(
             this,
             updates,
@@ -84,6 +93,8 @@ class MainActivity : ComponentActivity() {
                     uploadStatus = uploadStatus,
                     uploadSentAt = uploadSentAt,
                     samsungReadStatus = samsungReadStatus,
+                    historyCount = historyCount,
+                    recentHistory = recentHistory,
                     onReadSamsung = {
                         samsungReadStatus = "正在读取 Samsung Health..."
                         lifecycleScope.launch {
@@ -100,6 +111,7 @@ class MainActivity : ComponentActivity() {
                                 result.capturedAt
                             )
                             snapshot = HealthDataStore.read(this@MainActivity)
+                            refreshHistory()
                             samsungReadStatus = result.message
                         }
                     },
@@ -121,6 +133,8 @@ private fun PhoneHealthScreen(
     uploadStatus: String,
     uploadSentAt: Long,
     samsungReadStatus: String,
+    historyCount: Int,
+    recentHistory: List<String>,
     onReadSamsung: () -> Unit,
     onUploadNow: () -> Unit
 ) {
@@ -182,6 +196,16 @@ private fun PhoneHealthScreen(
                     HorizontalDivider()
                     Text(uploadStatus, fontSize = 17.sp, color = Color(0xFF006A6A))
                     Text("最近发送  " + formatTime(uploadSentAt), fontSize = 14.sp, color = Color(0xFF536164))
+                }
+            }
+            Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("本地历史档案", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("已持久化 $historyCount 条记录", fontSize = 14.sp, color = Color(0xFF536164))
+                    recentHistory.forEach { line ->
+                        Text(line, fontSize = 11.sp, color = Color(0xFF536164), maxLines = 2)
+                    }
+                    if (recentHistory.isEmpty()) Text("等待首次读取或手表事件", fontSize = 14.sp, color = Color(0xFF536164))
                 }
             }
             Button(
