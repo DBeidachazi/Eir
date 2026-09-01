@@ -3,6 +3,7 @@ package icu.dbeidachazi.eir.presentation
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.WindowManager
@@ -29,7 +30,12 @@ class MainActivity : ComponentActivity() {
     private var status by mutableStateOf("请先授予健康权限")
     private var reading by mutableStateOf(false)
     private val timeoutHandler = Handler(Looper.getMainLooper())
-    private val timeout = Runnable { if (reading) { reading = false; status = "10 秒内没有收到心率，请佩戴并贴合手腕后重试" } }
+    private val timeout = Runnable {
+        if (reading) {
+            reading = false
+            status = "10 秒内没有收到心率，请佩戴并贴合手腕后重试"
+        }
+    }
 
     private val permissions =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
@@ -38,35 +44,58 @@ class MainActivity : ComponentActivity() {
         }
     private val callback = object : MeasureCallback {
         override fun onRegistered() { status = "已连接心率传感器，等待数据…" }
-        override fun onRegistrationFailed(error: Throwable) { reading = false; status = "心率读取失败：${error.message ?: error.javaClass.simpleName}" }
+        override fun onRegistrationFailed(error: Throwable) {
+            timeoutHandler.removeCallbacks(timeout)
+            reading = false
+            status = "心率读取失败：${error.message ?: error.javaClass.simpleName}"
+        }
         override fun onAvailabilityChanged(type: DeltaDataType<*, *>, availability: Availability) {
             status = "传感器：$availability"
         }
 
         override fun onDataReceived(data: DataPointContainer) {
             data.getData(DataType.HEART_RATE_BPM).lastOrNull()
-                ?.let { heartRate = it.value; reading = false; status = "已读取" }
+                ?.let {
+                    timeoutHandler.removeCallbacks(timeout)
+                    heartRate = it.value
+                    reading = false
+                    status = "已读取"
+                }
         }
     }
 
     override fun onCreate(state: Bundle?) {
-        super.onCreate(state); window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON); client =
-            HealthServices.getClient(this).measureClient; setContent { EirTheme { Screen() } }
+        super.onCreate(state)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        client = HealthServices.getClient(this).measureClient
+        if (ContextCompat.checkSelfPermission(this, requiredPermission()) == PackageManager.PERMISSION_GRANTED) {
+            status = "权限已授予，点击读取心率"
+        }
+        setContent { EirTheme { Screen() } }
+    }
+
+    private fun requiredPermission(): String = if (Build.VERSION.SDK_INT >= 36) {
+        "android.permission.health.READ_HEART_RATE"
+    } else {
+        Manifest.permission.BODY_SENSORS
     }
 
     private fun read() {
-        val bodySensors = ContextCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS)
-        val readHeartRate = ContextCompat.checkSelfPermission(this, "android.permission.health.READ_HEART_RATE")
-        if (bodySensors != PackageManager.PERMISSION_GRANTED || readHeartRate != PackageManager.PERMISSION_GRANTED) {
-            permissions.launch(
-                arrayOf(
-                    Manifest.permission.BODY_SENSORS,
-                    "android.permission.health.READ_HEART_RATE",
-                    Manifest.permission.ACTIVITY_RECOGNITION
-                )
-            ); return
+        val permission = requiredPermission()
+        if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+            permissions.launch(arrayOf(permission))
+            return
         }
-        reading = true; status = "正在读取…"; timeoutHandler.postDelayed(timeout, 10_000); client.registerMeasureCallback(DataType.HEART_RATE_BPM, callback)
+        reading = true
+        status = "正在读取…"
+        timeoutHandler.postDelayed(timeout, 10_000)
+        try {
+            client.registerMeasureCallback(DataType.HEART_RATE_BPM, callback)
+        } catch (error: Throwable) {
+            timeoutHandler.removeCallbacks(timeout)
+            reading = false
+            status = "心率读取失败：${error.message ?: error.javaClass.simpleName}"
+        }
     }
 
     @Composable
