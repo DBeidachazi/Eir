@@ -151,27 +151,27 @@ private fun PhoneHealthScreen(
             } else {
                 Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF006A6A))) {
                     Column(modifier = Modifier.fillMaxWidth().padding(22.dp)) {
-                        Text("手表快照心率", color = Color(0xFFB8F0EC), fontSize = 16.sp)
+                        Text("手表实时睡眠状态", color = Color(0xFFB8F0EC), fontSize = 16.sp)
                         Text(
-                            snapshot.heartRateBpm?.let { it.toInt().toString() + " bpm" } ?: "-- bpm",
+                            snapshot.sleepState,
                             color = Color.White,
                             fontSize = 48.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text("采集于 " + formatTime(snapshot.capturedAt), color = Color.White, fontSize = 14.sp)
+                    Text("状态变化于 " + formatTime(snapshot.sleepStateChangedAt), color = Color.White, fontSize = 14.sp)
                     }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MetricCard("手表步数", snapshot.steps?.toString() ?: "--", Modifier.weight(1f))
-                    MetricCard("手表卡路里", snapshot.caloriesKcal?.let { it.toInt().toString() } ?: "--", Modifier.weight(1f))
+                    MetricCard("手表实时皮温", snapshot.skinTemperatureCelsius?.let { "%.1f °C".format(Locale.getDefault(), it) } ?: "未测量", Modifier.weight(1f))
+                    MetricCard("手表快照时间", formatTime(snapshot.capturedAt), Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MetricCard("距离", snapshot.distanceMeters?.let { it.toInt().toString() + " m" } ?: "--", Modifier.weight(1f))
-                    MetricCard("睡眠", snapshot.sleepState, Modifier.weight(1f))
+                    MetricCard("手表皮温来源", if (snapshot.skinTemperatureCelsius != null) "实时" else "未接入", Modifier.weight(1f))
+                    MetricCard("睡眠来源", "手表实时", Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard("血氧", snapshot.oxygenSaturation?.let { "%.1f %%".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
-                    MetricCard("皮肤温度", snapshot.bodyTemperatureCelsius?.let { "%.1f °C".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
+                    MetricCard("Samsung 皮温历史", snapshot.bodyTemperatureCelsius?.let { "%.1f °C".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
                 }
             }
             Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
@@ -181,7 +181,7 @@ private fun PhoneHealthScreen(
                     Text("心率  ${snapshot?.samsungHeartRateBpm?.let { "%.0f bpm".format(Locale.getDefault(), it) } ?: "暂无"}", fontSize = 16.sp)
                     Text("步数  ${snapshot?.samsungSteps?.toString() ?: "暂无"}", fontSize = 16.sp)
                     Text("卡路里  ${snapshot?.samsungCaloriesKcal?.let { "%.0f kcal".format(Locale.getDefault(), it) } ?: "暂无"}", fontSize = 16.sp)
-                    Text("睡眠阶段  ${snapshot?.samsungSleepState ?: "暂无"}", fontSize = 16.sp)
+                    Text("睡眠阶段（历史）  ${snapshot?.samsungSleepState ?: "暂无"}", fontSize = 16.sp)
                     Text("读取时间  ${formatTime(snapshot?.samsungCapturedAt ?: 0L)}", fontSize = 14.sp, color = Color(0xFF536164))
                     Button(
                         onClick = onReadSamsung,

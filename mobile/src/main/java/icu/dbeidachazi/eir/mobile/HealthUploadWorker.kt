@@ -38,9 +38,12 @@ class HealthUploadWorker(context: Context, params: WorkerParameters) : Coroutine
                 putNullable("steps", snapshot.samsungSteps ?: snapshot.steps)
                 putNullable("caloriesKcal", snapshot.samsungCaloriesKcal ?: snapshot.caloriesKcal)
                 putNullable("distanceMeters", snapshot.distanceMeters)
-                put("sleepState", snapshot.samsungSleepState ?: snapshot.sleepState)
+                // Sleep and skin temperature are watch realtime signals.
+                put("sleepState", snapshot.sleepState)
+                putNullable("skinTemperatureCelsius", snapshot.skinTemperatureCelsius)
+                putNullable("samsungSleepState", snapshot.samsungSleepState)
                 putNullable("oxygenSaturation", snapshot.oxygenSaturation)
-                putNullable("bodyTemperatureCelsius", snapshot.bodyTemperatureCelsius ?: snapshot.skinTemperatureCelsius)
+                putNullable("samsungBodyTemperatureCelsius", snapshot.bodyTemperatureCelsius)
             })
         }.toString()
 
