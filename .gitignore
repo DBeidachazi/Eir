@@ -9,7 +9,19 @@
 /.idea/assetWizardSettings.xml
 .DS_Store
 /build
+/app/build
+/mobile/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local outputs and device-specific files
+*.apk
+*.aab
+*.apks
+*.hprof
+
+# Samsung proprietary SDKs are downloaded locally after accepting the license.
+/app/libs/*.aar
+/app/libs/*.jar

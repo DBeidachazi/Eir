@@ -49,6 +49,7 @@ dependencies {
     implementation(libs.wear.tooling.preview)
     implementation(libs.health.services.client)
     implementation("com.google.guava:guava:33.4.0-android")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.test.manifest)
