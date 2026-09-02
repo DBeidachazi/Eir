@@ -1,6 +1,7 @@
 package icu.dbeidachazi.eir.mobile
 
 import android.content.Context
+import android.net.ConnectivityManager
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -19,9 +20,19 @@ import java.net.URL
 import java.util.concurrent.TimeUnit
 
 internal object PhoneUploadConfig {
-    const val endpoint = "https://eir.dbeidachazi.icu/api/health"
+    const val publicEndpoint = "https://eir.dbeidachazi.icu/api/health"
+    const val lanEndpoint = "http://192.168.1.111:3000/api/health"
     const val deviceId = "eir-watch"
     const val secret = "your-secret-key-here"
+
+    fun endpoints(context: Context): List<String> {
+        val manager = context.getSystemService(ConnectivityManager::class.java)
+        val linkProperties = manager?.getLinkProperties(manager.activeNetwork)
+        val onHomeLan = linkProperties?.linkAddresses?.any {
+            it.address.hostAddress?.startsWith("192.168.1.") == true
+        } == true
+        return if (onHomeLan) listOf(lanEndpoint, publicEndpoint) else listOf(publicEndpoint, lanEndpoint)
+    }
 }
 
 class HealthUploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -70,32 +81,39 @@ class HealthUploadWorker(context: Context, params: WorkerParameters) : Coroutine
                 putNullable("samsungSleepState", snapshot.samsungSleepState)
                 putNullable("oxygenSaturation", snapshot.oxygenSaturation)
                 putNullable("samsungBodyTemperatureCelsius", snapshot.bodyTemperatureCelsius)
+                // The reader combines Samsung skin/body temperature streams;
+                // keep a stable skin-temperature field for downstream panels.
+                putNullable("samsungSkinTemperatureCelsius", snapshot.bodyTemperatureCelsius)
             })
         }.toString()
 
-        runCatching {
-            val connection = (URL(PhoneUploadConfig.endpoint).openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                doOutput = true
-                setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                setRequestProperty("Accept", "application/json")
+        var lastFailure: Throwable? = null
+        for (endpoint in PhoneUploadConfig.endpoints(applicationContext)) {
+            try {
+                val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 5_000
+                    readTimeout = 10_000
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("X-Eir-Device", PhoneUploadConfig.deviceId)
+                    setRequestProperty("X-Eir-Device-Token", PhoneUploadConfig.secret)
+                }
+                connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
+                val code = connection.responseCode
+                connection.disconnect()
+                if (code in 200..299) {
+                    HealthDataStore.recordUpload(applicationContext, "已上报 ${endpoint} HTTP $code")
+                    return@withContext Result.success()
+                }
+                lastFailure = IllegalStateException("HTTP $code from $endpoint")
+            } catch (error: Throwable) {
+                lastFailure = error
             }
-            connection.outputStream.use { it.write(payload.toByteArray(Charsets.UTF_8)) }
-            val code = connection.responseCode
-            connection.disconnect()
-            if (code in 200..299) {
-                HealthDataStore.recordUpload(applicationContext, "已上报 HTTP " + code)
-                Result.success()
-            } else {
-                HealthDataStore.recordUpload(applicationContext, "上报失败 HTTP " + code)
-                Result.retry()
-            }
-        }.getOrElse { error ->
-            HealthDataStore.recordUpload(applicationContext, "上报失败：" + (error.message ?: error.javaClass.simpleName))
-            Result.retry()
         }
+        HealthDataStore.recordUpload(applicationContext, "上报失败：${lastFailure?.message ?: "无可用端点"}")
+        Result.retry()
     }
 
     private fun JSONObject.putNullable(key: String, value: Any?) {

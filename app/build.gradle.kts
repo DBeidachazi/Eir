@@ -36,6 +36,7 @@ android {
 }
 
 dependencies {
+    implementation(files("libs/samsung-health-sensor-api-1.4.1.aar"))
     implementation(platform(libs.compose.bom))
     implementation(libs.activity.compose)
     implementation(libs.compose.foundation)

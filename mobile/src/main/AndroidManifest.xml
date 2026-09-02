@@ -12,6 +12,7 @@
         android:label="Eir"
         android:supportsRtl="true"
         android:name=".mobile.EirMobileApplication"
+        android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.DeviceDefault">
         <activity
             android:name=".mobile.MainActivity"

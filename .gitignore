@@ -25,3 +25,4 @@ local.properties
 # Samsung proprietary SDKs are downloaded locally after accepting the license.
 /app/libs/*.aar
 /app/libs/*.jar
+!/app/libs/samsung-health-sensor-api-1.4.1.aar
