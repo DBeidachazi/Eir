@@ -169,7 +169,7 @@ private fun PhoneHealthScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard("手表皮温来源", if (snapshot.skinTemperatureCelsius != null) "实时" else "未接入", Modifier.weight(1f))
-                    MetricCard("手表事件时间", formatTime(snapshot.sleepStateChangedAt), Modifier.weight(1f))
+                    MetricCard("手机收到手表", formatTime(snapshot.watchReceivedAt), Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard("Samsung 血氧历史", snapshot.oxygenSaturation?.let { "%.1f %%".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))

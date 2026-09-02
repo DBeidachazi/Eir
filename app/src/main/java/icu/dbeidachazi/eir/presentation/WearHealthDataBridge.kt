@@ -29,17 +29,29 @@ internal object WearHealthDataBridge {
             snapshot.skinTemperatureCelsius?.let { dataMap.putDouble("skinTemperatureCelsius", it) }
             dataMap.putLong("updatedAt", System.currentTimeMillis())
         }.asPutDataRequest().setUrgent()
+        WatchLogStore.append(context, "bridge_send_started", mapOf(
+            "capturedAt" to snapshot.capturedAt.toString(),
+            "sleepState" to snapshot.sleepState
+        ))
         Wearable.getDataClient(context).putDataItem(request)
             .addOnSuccessListener {
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                     .putString(STATUS, "已传给手机")
                     .apply()
+                WatchLogStore.append(context, "bridge_send_succeeded", mapOf(
+                    "capturedAt" to snapshot.capturedAt.toString(),
+                    "sentAt" to System.currentTimeMillis().toString()
+                ))
                 context.sendBroadcast(android.content.Intent(HealthReportStore.ACTION_UPDATED).setPackage(context.packageName))
             }
             .addOnFailureListener { error ->
                 context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                     .putString(STATUS, "手机未连接")
                     .apply()
+                WatchLogStore.append(context, "bridge_send_failed", mapOf(
+                    "error" to (error.message ?: error.javaClass.simpleName),
+                    "failedAt" to System.currentTimeMillis().toString()
+                ))
                 Log.w(TAG, "Phone is not reachable", error)
                 context.sendBroadcast(android.content.Intent(HealthReportStore.ACTION_UPDATED).setPackage(context.packageName))
             }

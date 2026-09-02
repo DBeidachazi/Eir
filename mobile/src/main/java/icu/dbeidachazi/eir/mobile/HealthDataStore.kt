@@ -14,6 +14,7 @@ data class PhoneHealthSnapshot(
     val distanceMeters: Double?,
     val sleepState: String,
     val sleepStateChangedAt: Long,
+    val watchReceivedAt: Long,
     val skinTemperatureCelsius: Double?,
     val oxygenSaturation: Double?,
     val bodyTemperatureCelsius: Double?,
@@ -37,6 +38,7 @@ internal object HealthDataStore {
     fun saveFromDataMap(context: Context, dataMap: DataMap) {
         val snapshot = readJson(context)
         snapshot.put("capturedAt", dataMap.getLong("capturedAt", System.currentTimeMillis()))
+        snapshot.put("watchReceivedAt", System.currentTimeMillis())
         // The watch no longer owns these metrics; discard legacy values when a new watch snapshot arrives.
         snapshot.remove("heartRateBpm")
         snapshot.remove("steps")
@@ -111,6 +113,7 @@ internal object HealthDataStore {
                 distanceMeters = json.doubleOrNull("distanceMeters"),
                 sleepState = json.optString("sleepState", "未知"),
                 sleepStateChangedAt = json.optLong("sleepStateChangedAt", 0L),
+                watchReceivedAt = json.optLong("watchReceivedAt", 0L),
                 skinTemperatureCelsius = json.doubleOrNull("skinTemperatureCelsius"),
                 oxygenSaturation = json.doubleOrNull("oxygenSaturation"),
                 bodyTemperatureCelsius = json.doubleOrNull("bodyTemperatureCelsius"),

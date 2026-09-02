@@ -65,6 +65,7 @@ class HealthUploadWorker(context: Context, params: WorkerParameters) : Coroutine
                 putNullable("distanceMeters", snapshot.distanceMeters)
                 // Sleep and skin temperature are watch realtime signals.
                 put("sleepState", snapshot.sleepState)
+                put("watchReceivedAt", snapshot.watchReceivedAt)
                 putNullable("skinTemperatureCelsius", snapshot.skinTemperatureCelsius)
                 putNullable("samsungSleepState", snapshot.samsungSleepState)
                 putNullable("oxygenSaturation", snapshot.oxygenSaturation)
