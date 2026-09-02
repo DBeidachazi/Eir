@@ -178,7 +178,7 @@ private fun PhoneHealthScreen(
             }
             Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Samsung Health", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("Samsung Health 已同步数据", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     Text(samsungReadStatus, fontSize = 14.sp, color = Color(0xFF536164))
                     Text("心率  ${snapshot?.samsungHeartRateBpm?.let { "%.0f bpm".format(Locale.getDefault(), it) } ?: "暂无"}", fontSize = 16.sp)
                     Text("步数  ${snapshot?.samsungSteps?.toString() ?: "暂无"}", fontSize = 16.sp)

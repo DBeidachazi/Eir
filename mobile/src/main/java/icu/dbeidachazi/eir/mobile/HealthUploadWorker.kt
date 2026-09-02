@@ -43,6 +43,14 @@ class HealthUploadWorker(context: Context, params: WorkerParameters) : Coroutine
                     result.latestWorkout
                 )
             }
+            .onFailure {
+                // Do not leave an old synchronized value looking current after
+                // a provider/permission failure.
+                HealthDataStore.saveSamsungRead(
+                    applicationContext, null, null, null, null, null, null,
+                    System.currentTimeMillis(), 0, null
+                )
+            }
         val snapshot = HealthDataStore.read(applicationContext)
             ?: return@withContext Result.success()
         val payload = JSONObject().apply {
