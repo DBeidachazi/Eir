@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                         samsungReadStatus = "正在读取 Samsung Health..."
                         lifecycleScope.launch {
                             val result = runCatching { SamsungHealthReader.readOnce(this@MainActivity) }
-                                .getOrElse { SamsungReadResult(null, null, null, null, null, null, 0L, "读取失败：${it.message ?: it.javaClass.simpleName}") }
+                                .getOrElse { SamsungReadResult(null, null, null, null, null, null, 0, null, 0L, "读取失败：${it.message ?: it.javaClass.simpleName}") }
                             HealthDataStore.saveSamsungRead(
                                 this@MainActivity,
                                 result.heartRateBpm,
@@ -108,7 +108,9 @@ class MainActivity : ComponentActivity() {
                                 result.sleepState,
                                 result.oxygenSaturation,
                                 result.bodyTemperatureCelsius,
-                                result.capturedAt
+                                result.capturedAt,
+                                result.workoutCount,
+                                result.latestWorkout
                             )
                             snapshot = HealthDataStore.read(this@MainActivity)
                             refreshHistory()
@@ -167,10 +169,10 @@ private fun PhoneHealthScreen(
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard("手表皮温来源", if (snapshot.skinTemperatureCelsius != null) "实时" else "未接入", Modifier.weight(1f))
-                    MetricCard("睡眠来源", "手表实时", Modifier.weight(1f))
+                    MetricCard("手表事件时间", formatTime(snapshot.sleepStateChangedAt), Modifier.weight(1f))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    MetricCard("血氧", snapshot.oxygenSaturation?.let { "%.1f %%".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
+                    MetricCard("Samsung 血氧历史", snapshot.oxygenSaturation?.let { "%.1f %%".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
                     MetricCard("Samsung 皮温历史", snapshot.bodyTemperatureCelsius?.let { "%.1f °C".format(Locale.getDefault(), it) } ?: "暂无数据", Modifier.weight(1f))
                 }
             }
@@ -182,6 +184,8 @@ private fun PhoneHealthScreen(
                     Text("步数  ${snapshot?.samsungSteps?.toString() ?: "暂无"}", fontSize = 16.sp)
                     Text("卡路里  ${snapshot?.samsungCaloriesKcal?.let { "%.0f kcal".format(Locale.getDefault(), it) } ?: "暂无"}", fontSize = 16.sp)
                     Text("睡眠阶段（历史）  ${snapshot?.samsungSleepState ?: "暂无"}", fontSize = 16.sp)
+                    Text("运动历史  ${snapshot?.samsungWorkoutCount?.takeIf { it > 0 }?.toString() ?: "暂无"} 条", fontSize = 16.sp)
+                    snapshot?.samsungLatestWorkout?.let { Text("最近运动  $it", fontSize = 13.sp, color = Color(0xFF536164), maxLines = 2) }
                     Text("读取时间  ${formatTime(snapshot?.samsungCapturedAt ?: 0L)}", fontSize = 14.sp, color = Color(0xFF536164))
                     Button(
                         onClick = onReadSamsung,

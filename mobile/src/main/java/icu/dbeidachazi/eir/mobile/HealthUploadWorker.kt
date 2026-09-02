@@ -26,6 +26,23 @@ internal object PhoneUploadConfig {
 
 class HealthUploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        // Refresh Samsung Health in the worker so uploads do not depend on the
+        // dashboard being opened. This uses already granted permissions.
+        runCatching { SamsungHealthReader.readBackground(applicationContext) }
+            .onSuccess { result ->
+                HealthDataStore.saveSamsungRead(
+                    applicationContext,
+                    result.heartRateBpm,
+                    result.steps,
+                    result.caloriesKcal,
+                    result.sleepState,
+                    result.oxygenSaturation,
+                    result.bodyTemperatureCelsius,
+                    result.capturedAt,
+                    result.workoutCount,
+                    result.latestWorkout
+                )
+            }
         val snapshot = HealthDataStore.read(applicationContext)
             ?: return@withContext Result.success()
         val payload = JSONObject().apply {
@@ -105,8 +122,17 @@ internal object PhoneUploadScheduler {
 
 class HealthBootReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: Context, intent: android.content.Intent) {
-        if (intent.action == android.content.Intent.ACTION_BOOT_COMPLETED) {
+        if (intent.action == android.content.Intent.ACTION_BOOT_COMPLETED ||
+            intent.action == android.content.Intent.ACTION_MY_PACKAGE_REPLACED) {
             PhoneUploadScheduler.ensureScheduled(context)
         }
+    }
+}
+
+/** Schedules uploads as soon as the phone process is created, without a UI launch. */
+class EirMobileApplication : android.app.Application() {
+    override fun onCreate() {
+        super.onCreate()
+        PhoneUploadScheduler.ensureScheduled(this)
     }
 }

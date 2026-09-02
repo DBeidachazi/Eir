@@ -19,7 +19,9 @@ internal object SleepStateStore {
 
     fun from(info: UserActivityInfo): String = when (info.userActivityState) {
         UserActivityState.USER_ACTIVITY_ASLEEP -> "正在睡眠"
-        UserActivityState.USER_ACTIVITY_PASSIVE -> "静息/非运动"
+        // Health Services exposes PASSIVE for an awake, inactive user. It is
+        // the available wake signal on Wear OS; there is no separate AWAKE enum.
+        UserActivityState.USER_ACTIVITY_PASSIVE -> "清醒/静息"
         UserActivityState.USER_ACTIVITY_EXERCISE -> "运动中"
         else -> "暂时无法判断"
     }
@@ -39,13 +41,15 @@ class SleepPassiveListenerService : PassiveListenerService() {
 
     override fun onUserActivityInfoReceived(info: UserActivityInfo) {
         val state = SleepStateStore.from(info)
-        val changedAt = info.stateChangeTime?.toEpochMilli() ?: System.currentTimeMillis()
+        val callbackAt = System.currentTimeMillis()
+        val changedAt = info.stateChangeTime?.toEpochMilli() ?: callbackAt
         SleepStateStore.write(this, state, changedAt)
         HealthReportStore.saveSleepState(this, state, changedAt)
         WatchLogStore.append(this, "user_activity", mapOf(
             "state" to state,
             "stateChangeTime" to changedAt.toString(),
-            "callbackTime" to System.currentTimeMillis().toString()
+            "callbackTime" to callbackAt.toString(),
+            "rawState" to info.userActivityState.toString()
         ))
     }
 

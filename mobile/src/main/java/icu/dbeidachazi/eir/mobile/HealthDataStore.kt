@@ -21,6 +21,8 @@ data class PhoneHealthSnapshot(
     val samsungSteps: Long?,
     val samsungCaloriesKcal: Double?,
     val samsungSleepState: String?,
+    val samsungWorkoutCount: Int,
+    val samsungLatestWorkout: String?,
     val samsungCapturedAt: Long
 )
 
@@ -40,6 +42,7 @@ internal object HealthDataStore {
         snapshot.remove("steps")
         snapshot.remove("caloriesKcal")
         snapshot.remove("distanceMeters")
+        snapshot.put("skinTemperatureCelsius", JSONObject.NULL)
         dataMap.doubleOrNull("heartRateBpm")?.let { snapshot.put("heartRateBpm", it) }
         dataMap.longOrNull("steps")?.let { snapshot.put("steps", it) }
         dataMap.doubleOrNull("caloriesKcal")?.let { snapshot.put("caloriesKcal", it) }
@@ -64,16 +67,25 @@ internal object HealthDataStore {
         sleepState: String?,
         oxygenSaturation: Double?,
         bodyTemperatureCelsius: Double?,
-        capturedAt: Long?
+        capturedAt: Long?,
+        workoutCount: Int = 0,
+        latestWorkout: String? = null
     ) {
-        if (listOf(heartRateBpm, steps, caloriesKcal, sleepState, oxygenSaturation, bodyTemperatureCelsius).all { it == null }) return
         val snapshot = readJson(context)
+        // A read is a new point-in-time result. Never keep yesterday's value
+        // visible when the provider returned no current record or permission.
+        listOf(
+            "samsungHeartRateBpm", "samsungSteps", "samsungCaloriesKcal",
+            "samsungSleepState", "oxygenSaturation", "bodyTemperatureCelsius"
+        ).forEach { snapshot.put(it, JSONObject.NULL) }
         heartRateBpm?.let { snapshot.put("samsungHeartRateBpm", it) }
         steps?.let { snapshot.put("samsungSteps", it) }
         caloriesKcal?.let { snapshot.put("samsungCaloriesKcal", it) }
         sleepState?.let { snapshot.put("samsungSleepState", it) }
         oxygenSaturation?.let { snapshot.put("oxygenSaturation", it) }
         bodyTemperatureCelsius?.let { snapshot.put("bodyTemperatureCelsius", it) }
+        snapshot.put("samsungWorkoutCount", workoutCount)
+        snapshot.put("samsungLatestWorkout", latestWorkout ?: JSONObject.NULL)
         snapshot.put("samsungCapturedAt", capturedAt ?: System.currentTimeMillis())
         prefs(context).edit().putString(SNAPSHOT, snapshot.toString()).apply()
         appendHistory(context, "samsung", snapshot)
@@ -107,6 +119,10 @@ internal object HealthDataStore {
                 samsungCaloriesKcal = json.doubleOrNull("samsungCaloriesKcal"),
                 samsungSleepState = if (json.has("samsungSleepState") && !json.isNull("samsungSleepState")) {
                     json.optString("samsungSleepState")
+                } else null,
+                samsungWorkoutCount = json.optInt("samsungWorkoutCount", 0),
+                samsungLatestWorkout = if (json.has("samsungLatestWorkout") && !json.isNull("samsungLatestWorkout")) {
+                    json.optString("samsungLatestWorkout")
                 } else null,
                 samsungCapturedAt = json.optLong("samsungCapturedAt", 0L)
             )

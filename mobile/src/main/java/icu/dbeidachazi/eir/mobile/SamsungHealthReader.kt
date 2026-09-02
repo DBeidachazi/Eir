@@ -16,6 +16,8 @@ internal data class SamsungReadResult(
     val sleepState: String?,
     val oxygenSaturation: Double?,
     val bodyTemperatureCelsius: Double?,
+    val workoutCount: Int,
+    val latestWorkout: String?,
     val capturedAt: Long,
     val message: String
 )
@@ -37,7 +39,7 @@ internal object SamsungHealthReader {
         sdk.setActivity(activity)
         sdk.logListener = { Log.i(TAG, it) }
         if (!sdk.setProvider("samsung")) {
-            return@withContext SamsungReadResult(null, null, null, null, null, null, 0L, "手机未检测到可用的 Samsung Health")
+            return@withContext SamsungReadResult(null, null, null, null, null, null, 0, null, 0L, "手机未检测到可用的 Samsung Health")
         }
 
         val prefs = activity.getSharedPreferences(AUTH_PREFS, 0)
@@ -50,6 +52,24 @@ internal object SamsungHealthReader {
             result
         }
         val logContext = activity.applicationContext
+        readValues(logContext, sdk, authorized)
+    }
+
+    /** Reads already-authorized data without an Activity, for periodic background uploads. */
+    suspend fun readBackground(context: android.content.Context): SamsungReadResult = withContext(Dispatchers.IO) {
+        val sdk = OpenWearablesHealthSDK.initialize(context.applicationContext)
+        sdk.logListener = { Log.i(TAG, it) }
+        if (!sdk.setProvider("samsung")) {
+            return@withContext SamsungReadResult(null, null, null, null, null, null, 0, null, 0L, "手机未检测到可用的 Samsung Health")
+        }
+        readValues(context.applicationContext, sdk, authorized = true)
+    }
+
+    private suspend fun readValues(
+        logContext: android.content.Context,
+        sdk: OpenWearablesHealthSDK,
+        authorized: Boolean
+    ): SamsungReadResult {
         emit(logContext, "--- Samsung Health read ${System.currentTimeMillis()} ---")
         val heartRateRecords = readAndLog(logContext, sdk, "heartRate")
         val stepRecords = readAndLog(logContext, sdk, "steps")
@@ -61,7 +81,7 @@ internal object SamsungHealthReader {
         types.filter {
             it !in setOf("heartRate", "steps", "activeEnergy", "sleep", "oxygenSaturation", "bodyTemperature", "skinTemperature", "workout")
         }.forEach { readAndLog(logContext, sdk, it) }
-        readWorkoutAndLog(logContext, sdk)
+        val workoutSummary = readWorkoutAndLog(logContext, sdk)
         val heartRate = heartRateRecords.data.records.maxByOrNull { it.endDate }?.value
         val steps = sumToday(stepRecords)?.toLong()
         val calories = sumToday(calorieRecords)
@@ -69,7 +89,8 @@ internal object SamsungHealthReader {
         val oxygen = oxygenRecords.data.records.maxByOrNull { it.endDate }?.value
         val temperature = (skinTemperatureRecords.data.records + temperatureRecords.data.records)
             .maxByOrNull { it.endDate }?.value
-        val values = listOfNotNull(heartRate, steps, calories, sleep, oxygen, temperature)
+        val values = listOfNotNull(heartRate, steps, calories, sleep, oxygen, temperature) +
+            listOfNotNull(workoutSummary.first.takeIf { it > 0 })
         val newest = System.currentTimeMillis()
         val permissionHint = if (authorized) "" else "（权限未全部授权）"
         val message = if (values.isEmpty()) {
@@ -77,7 +98,8 @@ internal object SamsungHealthReader {
         } else {
             "已读取 ${values.size} 项 Samsung Health 数据$permissionHint"
         }
-        SamsungReadResult(heartRate, steps, calories, sleep, oxygen, temperature, newest, message)
+        return SamsungReadResult(heartRate, steps, calories, sleep, oxygen, temperature,
+            workoutSummary.first, workoutSummary.second, newest, message)
     }
 
     private suspend fun readAndLog(context: android.content.Context, sdk: OpenWearablesHealthSDK, type: String): ProviderReadResult {
@@ -106,16 +128,18 @@ internal object SamsungHealthReader {
         return result
     }
 
-    private suspend fun readWorkoutAndLog(context: android.content.Context, sdk: OpenWearablesHealthSDK) {
+    private suspend fun readWorkoutAndLog(context: android.content.Context, sdk: OpenWearablesHealthSDK): Pair<Int, String?> {
         val result = runCatching { sdk.readData("workout", limit = 1000) }
             .getOrElse {
                 emit(context, "workout read failed: ${it.javaClass.simpleName}: ${it.message}")
-                return
+                return 0 to null
             }
         emit(context, "workout: entries=${result.data.workouts.size}, maxTimestamp=${result.maxTimestamp}")
         result.data.workouts.forEach { workout ->
             emit(context, "workout type=${workout.type} title=${workout.title} start=${workout.startDate} end=${workout.endDate} device=${workout.source.deviceName}/${workout.source.deviceModel}")
         }
+        val latest = result.data.workouts.maxByOrNull { it.endDate }
+        return result.data.workouts.size to latest?.let { "${it.type} ${it.title} ${it.startDate}" }
     }
 
     private fun sumToday(result: ProviderReadResult): Double? {
